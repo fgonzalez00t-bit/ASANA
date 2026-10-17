@@ -9,7 +9,7 @@ Hecha con Next.js, Tailwind y Supabase (base de datos, login, permisos y tiempo 
 ### 1. Supabase (base de datos y login)
 
 1. Crea una cuenta en [supabase.com](https://supabase.com) y un proyecto nuevo (plan gratuito).
-2. En **SQL Editor**, pega el contenido de `supabase/migrations/0001_esquema_inicial.sql` y ejecútalo.
+2. En **SQL Editor**, pega y ejecuta, en orden y una sola vez cada uno, los archivos de `supabase/migrations/` (`0001_esquema_inicial.sql`, `0002_adjuntos.sql`, ...).
 3. En **Authentication > URL Configuration**, pon en **Site URL** la dirección donde vivirá la app (por ejemplo `https://tareas.vercel.app`) y agrega `https://tareas.vercel.app/**` en **Redirect URLs**.
 4. En **Project Settings > API** copia la **Project URL** y la clave **anon public**.
 

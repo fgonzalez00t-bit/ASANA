@@ -6,6 +6,7 @@ import type { Comment, Priority, Section, Task } from "@/lib/types";
 import { PRIORITY_LABEL } from "@/lib/types";
 import { displayName, positionBetween } from "@/lib/utils";
 import { Avatar } from "./avatar";
+import { TaskAttachments } from "./task-attachments";
 import { CheckButton } from "./task-fields";
 import { useWorkspace } from "./workspace-provider";
 
@@ -216,6 +217,8 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
             onBlur={(e) => e.target.value !== (task.description ?? "") && update({ description: e.target.value || null })}
           />
         </div>
+
+        <TaskAttachments taskId={task.id} />
 
         {!task.parent_task_id && (
           <div>
