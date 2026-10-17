@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tareas
 
-## Getting Started
+Herramienta de organización de tareas estilo Asana: espacios de trabajo, proyectos con secciones, tareas con subtareas, vista lista y tablero, "Mis tareas", comentarios e invitaciones con roles.
 
-First, run the development server:
+Hecha con Next.js, Tailwind y Supabase (base de datos, login, permisos y tiempo real).
+
+## Puesta en marcha
+
+### 1. Supabase (base de datos y login)
+
+1. Crea una cuenta en [supabase.com](https://supabase.com) y un proyecto nuevo (plan gratuito).
+2. En **SQL Editor**, pega el contenido de `supabase/migrations/0001_esquema_inicial.sql` y ejecútalo.
+3. En **Authentication > URL Configuration**, pon en **Site URL** la dirección donde vivirá la app (por ejemplo `https://tareas.vercel.app`) y agrega `https://tareas.vercel.app/**` en **Redirect URLs**.
+4. En **Project Settings > API** copia la **Project URL** y la clave **anon public**.
+
+### 2. Vercel (publicar la app)
+
+1. Crea una cuenta en [vercel.com](https://vercel.com) con tu usuario de GitHub.
+2. **Add New > Project** y elige este repositorio.
+3. En **Environment Variables** agrega:
+   - `NEXT_PUBLIC_SUPABASE_URL` = la Project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = la clave anon
+4. **Deploy**. Cada cambio que se suba a `main` se publica solo.
+
+### 3. Primer uso
+
+1. Abre la app, crea tu cuenta y confirma el email.
+2. Crea tu espacio de trabajo y tu primer proyecto con el **+** del menú.
+3. Para sumar a alguien: **Equipo > Invitar**, escribe su email y envíale el enlace que se copia.
+
+## Roles
+
+| Rol | Puede |
+| --- | --- |
+| Dueña | Todo, incluido renombrar el espacio |
+| Administradora | Crear y borrar proyectos y secciones, editar cualquier tarea, invitar y quitar miembros |
+| Miembro | Ver los proyectos, crear tareas, editar y completar las suyas, comentar |
+
+Los permisos los aplica la base de datos (Row Level Security), no solo la interfaz.
+
+## Desarrollo local
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local   # completa con los datos de Supabase
+npm install
+npm run dev                  # http://localhost:3000
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
