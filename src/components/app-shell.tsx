@@ -75,6 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {navItem("/mis-tareas", "Mis tareas")}
+          {navItem("/calendario", "Calendario")}
           {navItem("/equipo", "Equipo")}
 
           <div className="flex items-center justify-between px-3 pt-5 pb-1">
