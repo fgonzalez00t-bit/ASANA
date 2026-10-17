@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+// Todo depende de la sesión de Supabase: nada se genera al compilar.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Tareas",
   description: "Organiza proyectos y tareas con tu equipo",
