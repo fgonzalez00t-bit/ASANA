@@ -33,8 +33,8 @@ Hecha con Next.js, Tailwind y Supabase (base de datos, login, permisos y tiempo 
 | Rol | Puede |
 | --- | --- |
 | Dueña | Todo, incluido renombrar el espacio |
-| Administradora | Crear y borrar proyectos y secciones, editar cualquier tarea, invitar y quitar miembros |
-| Miembro | Ver los proyectos, crear tareas, editar y completar las suyas, comentar |
+| Administradora | Ver todas las tareas (Panel del equipo), asignarlas, crear y borrar proyectos y secciones, invitar y quitar miembros |
+| Miembro | Ver solo las tareas que tiene asignadas o que creó, trabajarlas, comentar y adjuntar archivos |
 
 Los permisos los aplica la base de datos (Row Level Security), no solo la interfaz.
 

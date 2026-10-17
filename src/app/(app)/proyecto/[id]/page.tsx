@@ -6,7 +6,8 @@ import { NO_SECTION, ProjectBoard, type Column } from "@/components/project-boar
 import { TaskPanel } from "@/components/task-panel";
 import { useWorkspace } from "@/components/workspace-provider";
 import { createClient } from "@/lib/supabase/client";
-import { PROJECT_COLORS, type Section, type Task } from "@/lib/types";
+import { ColorPicker } from "@/components/task-fields";
+import type { Section, Task } from "@/lib/types";
 import { positionBetween } from "@/lib/utils";
 
 type Layout = "lista" | "tablero";
@@ -25,6 +26,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [layout, setLayout] = useState<Layout>("lista");
   const [showCompleted, setShowCompleted] = useState(true);
   const [openTask, setOpenTask] = useState<string | null>(null);
+  const [pickingColor, setPickingColor] = useState(false);
 
   useEffect(() => {
     try {
@@ -153,9 +155,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     await reload();
   }
 
-  async function recolorProject() {
-    const next = PROJECT_COLORS[(PROJECT_COLORS.indexOf(project!.color) + 1) % PROJECT_COLORS.length];
-    await supabase.from("projects").update({ color: next }).eq("id", id);
+  async function recolorProject(color: string | null) {
+    setPickingColor(false);
+    if (!color) return;
+    await supabase.from("projects").update({ color }).eq("id", id);
     await reload();
   }
 
@@ -179,7 +182,19 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     <div className="flex h-full flex-col">
       <div className="border-b border-slate-200 bg-white px-4 pt-4">
         <div className="flex flex-wrap items-center gap-2">
-          <button className="h-4 w-4 rounded" style={{ background: project.color }} title={isAdmin ? "Cambiar color" : undefined} onClick={() => isAdmin && recolorProject()} />
+          <div className="relative">
+            <button
+              className="block h-4 w-4 rounded"
+              style={{ background: project.color }}
+              title={isAdmin ? "Cambiar color" : undefined}
+              onClick={() => isAdmin && setPickingColor((v) => !v)}
+            />
+            {pickingColor && (
+              <div className="absolute top-6 left-0 z-20 w-56 rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+                <ColorPicker value={project.color} onChange={recolorProject} />
+              </div>
+            )}
+          </div>
           <h1 className="text-xl font-semibold">{project.name}</h1>
           {isAdmin && (
             <>

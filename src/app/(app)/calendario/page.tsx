@@ -182,7 +182,7 @@ export default function CalendarPage() {
                 {/* Celular: puntitos de color. Computadora: el nombre de cada tarea. */}
                 <div className="flex flex-wrap gap-0.5 md:hidden">
                   {list.slice(0, 6).map((t) => (
-                    <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${t.completed ? "opacity-30" : ""}`} style={{ background: t.project.color }} />
+                    <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${t.completed ? "opacity-30" : ""}`} style={{ background: t.color ?? t.project.color }} />
                   ))}
                 </div>
                 <div className="hidden space-y-0.5 md:block">
@@ -194,7 +194,7 @@ export default function CalendarPage() {
                         setOpenTask(t.id);
                       }}
                       className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-xs text-white ${t.completed ? "line-through opacity-50" : ""}`}
-                      style={{ background: t.project.color }}
+                      style={{ background: t.color ?? t.project.color }}
                       title={`${t.title} · ${t.project.name}`}
                     >
                       {t.title}
@@ -217,6 +217,7 @@ export default function CalendarPage() {
             {selectedTasks.map((t) => (
               <li key={t.id} onClick={() => setOpenTask(t.id)} className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50">
                 <CheckButton task={t} onToggle={() => toggle(t)} />
+                {t.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: t.color }} />}
                 <span className={`min-w-0 flex-1 truncate text-sm ${t.completed ? "text-slate-400 line-through" : ""}`}>{t.title}</span>
                 <PriorityBadge priority={t.priority} />
                 <span className="hidden items-center gap-1 text-xs text-slate-500 sm:flex">

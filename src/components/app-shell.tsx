@@ -75,6 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {navItem("/mis-tareas", "Mis tareas")}
+          {isAdmin && navItem("/panel", "Panel del equipo")}
           {navItem("/calendario", "Calendario")}
           {navItem("/equipo", "Equipo")}
 

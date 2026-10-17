@@ -158,7 +158,12 @@ function TaskItem({
   const { members } = useWorkspace();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const assignee = members.find((m) => m.user_id === task.assignee_id)?.profile ?? null;
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    boxShadow: task.color ? `inset 4px 0 0 ${task.color}` : undefined,
+  };
 
   const title = <span className={`min-w-0 flex-1 text-sm ${task.completed ? "text-slate-400 line-through" : ""}`}>{task.title}</span>;
   const subBadge = sub && sub.total > 0 && (

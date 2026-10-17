@@ -114,6 +114,7 @@ export default function MyTasksPage() {
               {list.map((t) => (
                 <li key={t.id} onClick={() => setOpenTask(t.id)} className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50">
                   <CheckButton task={t} onToggle={() => toggle(t)} />
+                  {t.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: t.color }} />}
                   <span className={`min-w-0 flex-1 truncate text-sm ${t.completed ? "text-slate-400 line-through" : ""}`}>{t.title}</span>
                   <PriorityBadge priority={t.priority} />
                   <Link

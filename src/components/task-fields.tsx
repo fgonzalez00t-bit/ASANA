@@ -1,5 +1,5 @@
 import type { Priority, Task } from "@/lib/types";
-import { PRIORITY_CLASS, PRIORITY_LABEL } from "@/lib/types";
+import { PRIORITY_CLASS, PRIORITY_LABEL, PROJECT_COLORS } from "@/lib/types";
 import { formatDue } from "@/lib/utils";
 
 export function DueBadge({ date, completed }: { date: string | null; completed?: boolean }) {
@@ -30,5 +30,34 @@ export function CheckButton({ task, onToggle, disabled }: { task: Pick<Task, "co
     >
       ✓
     </button>
+  );
+}
+
+export function ColorPicker({ value, onChange, allowNone, disabled }: { value: string | null; onChange: (c: string | null) => void; allowNone?: boolean; disabled?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {allowNone && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(null)}
+          title="Sin color"
+          className={`h-6 w-6 rounded-full border border-dashed border-slate-300 text-[10px] text-slate-400 ${value === null ? "ring-2 ring-slate-400 ring-offset-1" : ""}`}
+        >
+          ✕
+        </button>
+      )}
+      {PROJECT_COLORS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(c)}
+          aria-label={`Color ${c}`}
+          className={`h-6 w-6 rounded-full ${value === c ? "ring-2 ring-slate-500 ring-offset-1" : ""}`}
+          style={{ background: c }}
+        />
+      ))}
+    </div>
   );
 }
