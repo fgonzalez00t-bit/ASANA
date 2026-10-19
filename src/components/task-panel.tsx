@@ -7,6 +7,7 @@ import { PRIORITY_LABEL } from "@/lib/types";
 import { displayName, positionBetween } from "@/lib/utils";
 import { Avatar } from "./avatar";
 import { TaskAttachments } from "./task-attachments";
+import { useProjectPeople } from "./project-people";
 import { CheckButton, ColorPicker } from "./task-fields";
 import { useWorkspace } from "./workspace-provider";
 
@@ -26,6 +27,12 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
   const [activity, setActivity] = useState<TaskActivity[]>([]);
   const [newSub, setNewSub] = useState("");
   const [newComment, setNewComment] = useState("");
+  const [handoffTo, setHandoffTo] = useState("");
+  const [handoffNote, setHandoffNote] = useState("");
+  const [handingOff, setHandingOff] = useState(false);
+  const { people } = useProjectPeople(task?.project_id);
+  // La dueña puede asignar a cualquiera (queda sumada al proyecto); las demás, a quienes participan.
+  const assignable = isAdmin ? members : people;
 
   const load = useCallback(async () => {
     const [{ data: t }, { data: subs }, { data: cs }, { data: act }] = await Promise.all([
@@ -103,6 +110,19 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
     await load();
   }
 
+  async function handOff(e: React.FormEvent) {
+    e.preventDefault();
+    if (!handoffTo) return;
+    const { error } = await supabase.from("tasks").update({ assignee_id: handoffTo }).eq("id", taskId);
+    if (error) return alert("No se pudo pasar la tarea: " + error.message);
+    if (handoffNote.trim()) await supabase.from("comments").insert({ task_id: taskId, user_id: me.id, body: handoffNote.trim() });
+    setHandoffTo("");
+    setHandoffNote("");
+    setHandingOff(false);
+    await load();
+    onChanged();
+  }
+
   async function deleteTask() {
     if (!confirm("¿Borrar esta tarea y sus subtareas?")) return;
     await supabase.from("tasks").delete().eq("id", taskId);
@@ -147,12 +167,10 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
             <select
               className="input py-1"
               value={task.assignee_id ?? ""}
-              disabled={!isAdmin}
-              title={isAdmin ? undefined : "Solo la dueña o una administradora asigna tareas"}
               onChange={(e) => update({ assignee_id: e.target.value || null })}
             >
               <option value="">Sin asignar</option>
-              {members.map((m) => (
+              {assignable.map((m) => (
                 <option key={m.user_id} value={m.user_id}>
                   {displayName(m.profile)}
                 </option>
@@ -210,6 +228,40 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
             </>
           )}
         </dl>
+
+        {handingOff ? (
+          <form onSubmit={handOff} className="space-y-2 rounded-md border border-indigo-200 bg-indigo-50/50 p-3">
+            <h3 className="text-sm font-medium text-slate-700">Pasar la tarea</h3>
+            <select className="input" value={handoffTo} onChange={(e) => setHandoffTo(e.target.value)} required>
+              <option value="">¿A quién se la pasás?</option>
+              {assignable
+                .filter((m) => m.user_id !== task.assignee_id)
+                .map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {displayName(m.profile)}
+                  </option>
+                ))}
+            </select>
+            <textarea
+              className="input min-h-16"
+              placeholder="Comentario: qué hiciste y qué falta (opcional)"
+              value={handoffNote}
+              onChange={(e) => setHandoffNote(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-ghost" onClick={() => setHandingOff(false)}>
+                Cancelar
+              </button>
+              <button className="btn-primary" disabled={!handoffTo}>
+                Pasar tarea
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button className="btn border border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => setHandingOff(true)}>
+            ↪ Pasar a otra persona
+          </button>
+        )}
 
         <div>
           <h3 className="mb-1 text-sm font-medium text-slate-700">Descripción</h3>
@@ -325,7 +377,8 @@ function describeActivity(a: TaskActivity, profileOf: (id: string | null) => Pro
     case "titulo":
       return `cambió el nombre a "${a.new_value}"`;
     case "responsable":
-      return a.new_value ? `asignó la tarea a ${displayName(profileOf(a.new_value))}` : "dejó la tarea sin asignar";
+      if (!a.new_value) return "dejó la tarea sin asignar";
+      return `${a.old_value ? "le pasó la tarea a" : "asignó la tarea a"} ${displayName(profileOf(a.new_value))}`;
     case "fecha":
       return a.new_value ? `cambió la fecha a ${formatDate(a.new_value)}` : "quitó la fecha";
     case "completada":

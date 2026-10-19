@@ -3,7 +3,9 @@
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { NO_SECTION, ProjectBoard, type Column } from "@/components/project-board";
+import { Avatar } from "@/components/avatar";
 import { MonthCalendar } from "@/components/month-calendar";
+import { ProjectMembersDialog, useProjectPeople } from "@/components/project-people";
 import { TaskPanel } from "@/components/task-panel";
 import { useWorkspace } from "@/components/workspace-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +30,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [showCompleted, setShowCompleted] = useState(true);
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [pickingColor, setPickingColor] = useState(false);
+  const [editingMembers, setEditingMembers] = useState(false);
+  const { participants, reload: reloadPeople } = useProjectPeople(id);
+
+  // Al crear un proyecto se abre directo la elección de participantes.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("participantes") === "1") {
+      setEditingMembers(true);
+      router.replace(`/proyecto/${id}`);
+    }
+  }, [id, router]);
 
   useEffect(() => {
     try {
@@ -197,6 +209,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             )}
           </div>
           <h1 className="text-xl font-semibold">{project.name}</h1>
+          <button
+            className="ml-2 flex items-center gap-1 rounded-full px-1 py-0.5 hover:bg-slate-100"
+            title={isAdmin ? "Elegir participantes" : "Participantes"}
+            onClick={() => isAdmin && setEditingMembers(true)}
+          >
+            <span className="flex -space-x-1.5">
+              {participants.slice(0, 5).map((m) => (
+                <span key={m.user_id} className="rounded-full ring-2 ring-white">
+                  <Avatar profile={m.profile} size="xs" />
+                </span>
+              ))}
+            </span>
+            {participants.length > 5 && <span className="text-xs text-slate-500">+{participants.length - 5}</span>}
+            {isAdmin && <span className="px-1 text-xs text-slate-500">{participants.length === 0 ? "+ Participantes" : "Editar"}</span>}
+          </button>
           {isAdmin && (
             <>
               <button className="btn-ghost text-xs" onClick={renameProject}>
@@ -241,6 +268,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         />
       )}
 
+      {editingMembers && <ProjectMembersDialog projectId={id} onClose={() => setEditingMembers(false)} onChanged={() => void reloadPeople()} />}
       {openTask && <TaskPanel taskId={openTask} sections={sections} onClose={() => setOpenTask(null)} onChanged={load} />}
     </div>
   );

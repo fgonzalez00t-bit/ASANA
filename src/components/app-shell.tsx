@@ -34,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setNewName("");
     setCreating(false);
     await reload();
-    router.push(`/proyecto/${data.id}`);
+    router.push(`/proyecto/${data.id}?participantes=1`);
   }
 
   async function signOut() {
