@@ -7,7 +7,7 @@ import { CheckButton, PriorityBadge } from "@/components/task-fields";
 import { useWorkspace } from "@/components/workspace-provider";
 import { createClient } from "@/lib/supabase/client";
 import type { Project, Task } from "@/lib/types";
-import { positionBetween } from "@/lib/utils";
+import { displayName, positionBetween } from "@/lib/utils";
 
 type CalTask = Task & { project: Pick<Project, "id" | "name" | "color" | "workspace_id"> };
 
@@ -182,13 +182,16 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
                     {d.getDate()}
                   </span>
                 </div>
-                {/* Celular: puntitos de color. Computadora: el nombre de cada tarea. */}
+                {/* Celular: la cara de cada responsable. Computadora: tarjeta con responsable y nombre. */}
                 <div className="flex flex-wrap gap-0.5 md:hidden">
-                  {list.slice(0, 6).map((t) => (
-                    <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${t.completed ? "opacity-30" : ""}`} style={{ background: t.color ?? t.project.color }} />
+                  {list.slice(0, 2).map((t) => (
+                    <span key={t.id} className={t.completed ? "opacity-40" : ""}>
+                      <Avatar profile={profileOf(t.assignee_id)} size="xs" />
+                    </span>
                   ))}
+                  {list.length > 2 && <span className="text-[10px] text-slate-500">+{list.length - 2}</span>}
                 </div>
-                <div className="hidden space-y-0.5 md:block">
+                <div className="hidden space-y-1 md:block">
                   {list.slice(0, 3).map((t) => (
                     <button
                       key={t.id}
@@ -196,11 +199,16 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
                         e.stopPropagation();
                         setOpenTask(t.id);
                       }}
-                      className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-xs text-white ${t.completed ? "line-through opacity-50" : ""}`}
-                      style={{ background: t.color ?? t.project.color }}
-                      title={`${t.title} · ${t.project.name}`}
+                      className="flex w-full items-center gap-1.5 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-left text-xs shadow-sm hover:border-slate-300"
+                      style={{ boxShadow: `inset 3px 0 0 ${t.color ?? t.project.color}` }}
+                      title={`${t.title} · ${displayName(profileOf(t.assignee_id))} · ${t.project.name}`}
                     >
-                      {t.title}
+                      {t.completed ? (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-emerald-600">✓</span>
+                      ) : (
+                        <Avatar profile={profileOf(t.assignee_id)} size="xs" />
+                      )}
+                      <span className={`min-w-0 flex-1 truncate ${t.completed ? "text-slate-400" : "text-slate-800"}`}>{t.title}</span>
                     </button>
                   ))}
                   {list.length > 3 && <p className="px-1 text-xs text-slate-500">+{list.length - 3} más</p>}
@@ -227,7 +235,10 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
                   <span className="h-2 w-2 rounded-sm" style={{ background: t.project.color }} />
                   {t.project.name}
                 </span>
-                <Avatar profile={profileOf(t.assignee_id)} size="sm" />
+                <span className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <Avatar profile={profileOf(t.assignee_id)} size="sm" />
+                  <span className="hidden max-w-28 truncate sm:inline">{displayName(profileOf(t.assignee_id))}</span>
+                </span>
               </li>
             ))}
           </ul>
