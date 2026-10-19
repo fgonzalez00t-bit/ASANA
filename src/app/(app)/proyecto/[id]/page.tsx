@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { NO_SECTION, ProjectBoard, type Column } from "@/components/project-board";
+import { MonthCalendar } from "@/components/month-calendar";
 import { TaskPanel } from "@/components/task-panel";
 import { useWorkspace } from "@/components/workspace-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -10,7 +11,7 @@ import { ColorPicker } from "@/components/task-fields";
 import type { Section, Task } from "@/lib/types";
 import { positionBetween } from "@/lib/utils";
 
-type Layout = "lista" | "tablero";
+type Layout = "lista" | "tablero" | "calendario";
 const LAYOUT_KEY = "tareas.vista";
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,7 +32,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LAYOUT_KEY);
-      if (saved === "lista" || saved === "tablero") setLayout(saved);
+      if (saved === "lista" || saved === "tablero" || saved === "calendario") setLayout(saved);
     } catch {}
   }, []);
 
@@ -210,12 +211,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <div className="mt-3 flex items-center gap-4">
           {tab("lista", "Lista")}
           {tab("tablero", "Tablero")}
+          {tab("calendario", "Calendario")}
           <span className="flex-1" />
-          <label className="flex items-center gap-1 pb-2 text-xs text-slate-500">
+          <label className={`flex items-center gap-1 pb-2 text-xs text-slate-500 ${layout === "calendario" ? "hidden" : ""}`}>
             <input type="checkbox" checked={showCompleted} onChange={(e) => setShowCompleted(e.target.checked)} />
             Mostrar completadas
           </label>
-          {isAdmin && (
+          {isAdmin && layout !== "calendario" && (
             <button className="btn-ghost mb-1 text-xs" onClick={addSection}>
               + Sección
             </button>
@@ -223,17 +225,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
-      <ProjectBoard
-        layout={layout}
-        columns={columns}
-        subtaskCount={subtaskCount}
-        onOpen={(t) => setOpenTask(t.id)}
-        onToggle={toggle}
-        onMove={move}
-        onAddTask={addTask}
-        onRenameSection={renameSection}
-        onDeleteSection={deleteSection}
-      />
+      {layout === "calendario" ? (
+        <MonthCalendar key={id} projectId={id} />
+      ) : (
+        <ProjectBoard
+          layout={layout}
+          columns={columns}
+          subtaskCount={subtaskCount}
+          onOpen={(t) => setOpenTask(t.id)}
+          onToggle={toggle}
+          onMove={move}
+          onAddTask={addTask}
+          onRenameSection={renameSection}
+          onDeleteSection={deleteSection}
+        />
+      )}
 
       {openTask && <TaskPanel taskId={openTask} sections={sections} onClose={() => setOpenTask(null)} onChanged={load} />}
     </div>
