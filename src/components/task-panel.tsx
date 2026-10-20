@@ -32,8 +32,8 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
   const [handoffNote, setHandoffNote] = useState("");
   const [handingOff, setHandingOff] = useState(false);
   const { people } = useProjectPeople(task?.project_id);
-  // La dueña puede asignar a cualquiera (queda sumada al proyecto); las demás, a quienes participan.
-  const assignable = isAdmin ? members : people;
+  // Solo se puede asignar a participantes del proyecto (y a la dueña o administradoras).
+  const assignable = people;
 
   const load = useCallback(async () => {
     const [{ data: t }, { data: subs }, { data: cs }, { data: act }] = await Promise.all([
@@ -111,20 +111,14 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
     await load();
   }
 
-  // Una colaboradora que pasa su tarea deja de verla, así que el panel se cierra.
   async function passTo(toUser: string | null, note: string) {
-    // La dueña puede asignar a cualquiera (si no participaba, queda sumada al proyecto).
-    const { error } = isAdmin
-      ? await supabase.from("tasks").update({ assignee_id: toUser }).eq("id", taskId)
-      : await supabase.rpc("pass_task", { task: taskId, to_user: toUser, note });
-    if (!error && isAdmin && note.trim()) await supabase.from("comments").insert({ task_id: taskId, user_id: me.id, body: note.trim() });
+    const { error } = await supabase.rpc("pass_task", { task: taskId, to_user: toUser, note });
     if (error) return alert("No se pudo pasar la tarea: " + error.message);
     setHandoffTo("");
     setHandoffNote("");
     setHandingOff(false);
     onChanged();
-    if (isAdmin) await load();
-    else onClose();
+    await load();
   }
 
   async function handOff(e: React.FormEvent) {
@@ -176,7 +170,7 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
             <select
               className="input py-1"
               value={task.assignee_id ?? ""}
-              onChange={(e) => (isAdmin ? update({ assignee_id: e.target.value || null }) : passTo(e.target.value || null, ""))}
+              onChange={(e) => passTo(e.target.value || null, "")}
             >
               <option value="">Sin asignar</option>
               {assignable.map((m) => (

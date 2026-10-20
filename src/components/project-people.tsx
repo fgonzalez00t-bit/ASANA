@@ -61,7 +61,7 @@ export function ProjectMembersDialog({ projectId, onClose, onChanged }: { projec
           </button>
         </div>
         <p className="mb-4 text-sm text-slate-500">
-          Las participantes ven todas las tareas de este proyecto y se las pueden pasar entre ellas. Las demás colaboradoras no lo ven.
+          Las participantes ven todo este proyecto y se pueden pasar las tareas entre ellas. Solo a ellas se les pueden asignar tareas. Las demás colaboradoras no lo ven.
         </p>
 
         {collaborators.length === 0 ? (
