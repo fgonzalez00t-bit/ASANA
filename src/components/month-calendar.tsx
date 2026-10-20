@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { TaskPanel } from "@/components/task-panel";
+import { useProjectPeople } from "@/components/project-people";
 import { CheckButton, PriorityBadge } from "@/components/task-fields";
 import { useWorkspace } from "@/components/workspace-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -44,6 +45,9 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [quickAdd, setQuickAdd] = useState(false);
+  const { people } = useProjectPeople(projectId);
 
   const days = useMemo(() => monthGrid(cursor.year, cursor.month), [cursor]);
   const from = iso(days[0]!);
@@ -114,13 +118,21 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
       section_id: first?.[0]?.id ?? null,
       title: title.trim(),
       due_date: selected,
-      assignee_id: me.id,
+      assignee_id: assigneeId || null,
       created_by: me.id,
       position: positionBetween(),
     });
     if (error) return alert(error.message);
     setTitle("");
+    setQuickAdd(false);
     await load();
+  }
+
+  function openQuickAdd(day: string) {
+    setSelected(day);
+    setTitle("");
+    setAssigneeId(me.id);
+    setQuickAdd(true);
   }
 
   const monthLabel = new Date(cursor.year, cursor.month, 1).toLocaleDateString("es", { month: "long", year: "numeric" });
@@ -172,7 +184,8 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
             return (
               <div
                 key={key}
-                onClick={() => setSelected(key)}
+                onClick={() => openQuickAdd(key)}
+                title="Tocá para crear una tarea este día"
                 className={`min-h-16 cursor-pointer border-r border-b border-slate-100 p-1 md:min-h-28 ${inMonth ? "" : "bg-slate-50/70"} ${isSelected ? "ring-2 ring-indigo-400 ring-inset" : "hover:bg-slate-50"}`}
               >
                 <div className="mb-1 flex justify-end">
@@ -249,19 +262,62 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
         )}
 
         {projects.length > 0 && (
-          <form onSubmit={add} className="flex flex-col gap-2 sm:flex-row">
-            <input className="input flex-1" placeholder="Nueva tarea para este día..." value={title} onChange={(e) => setTitle(e.target.value)} />
-            <select className={`input sm:w-48 ${fixedProject ? "hidden" : ""}`} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <button className="btn-primary">Agregar</button>
-          </form>
+          <button className="btn-ghost text-indigo-700" onClick={() => openQuickAdd(selected)}>
+            + Nueva tarea para este día
+          </button>
         )}
       </section>
+
+      {quickAdd && projects.length > 0 && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setQuickAdd(false)} />
+          <form onSubmit={add} className="fixed inset-x-4 top-24 z-50 mx-auto max-w-md space-y-3 rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold first-letter:uppercase">Nueva tarea · {selectedLabel}</h2>
+              <button type="button" className="btn-ghost" onClick={() => setQuickAdd(false)} aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+            <input autoFocus className="input" placeholder="Nombre de la tarea" value={title} onChange={(e) => setTitle(e.target.value)} />
+            {!fixedProject && (
+              <label className="block text-sm text-slate-500">
+                Proyecto
+                <select className="input mt-1" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="block text-sm text-slate-500">
+              Responsable
+              <select className="input mt-1" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {people.map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.user_id === me.id ? `${displayName(m.profile)} (yo)` : displayName(m.profile)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedTasks.length > 0 && (
+              <p className="text-xs text-slate-500">
+                Ese día ya hay: {selectedTasks.map((t) => t.title).join(", ")}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-ghost" onClick={() => setQuickAdd(false)}>
+                Cancelar
+              </button>
+              <button className="btn-primary" disabled={!title.trim()}>
+                Crear tarea
+              </button>
+            </div>
+          </form>
+        </>
+      )}
 
       {openTask && <TaskPanel taskId={openTask} onClose={() => setOpenTask(null)} onChanged={load} />}
     </div>
