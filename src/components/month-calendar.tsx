@@ -199,16 +199,18 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
                         e.stopPropagation();
                         setOpenTask(t.id);
                       }}
-                      className="flex w-full items-center gap-1.5 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-left text-xs shadow-sm hover:border-slate-300"
-                      style={{ boxShadow: `inset 3px 0 0 ${t.color ?? t.project.color}` }}
+                      className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-xs text-white shadow-sm hover:brightness-110 ${t.completed ? "opacity-50" : ""}`}
+                      style={{ background: t.color ?? t.project.color }}
                       title={`${t.title} · ${displayName(profileOf(t.assignee_id))} · ${t.project.name}`}
                     >
                       {t.completed ? (
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-emerald-600">✓</span>
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/30 font-bold">✓</span>
                       ) : (
-                        <Avatar profile={profileOf(t.assignee_id)} size="xs" />
+                        <span className="shrink-0 rounded-full ring-1 ring-white/80">
+                          <Avatar profile={profileOf(t.assignee_id)} size="xs" />
+                        </span>
                       )}
-                      <span className={`min-w-0 flex-1 truncate ${t.completed ? "text-slate-400" : "text-slate-800"}`}>{t.title}</span>
+                      <span className={`min-w-0 flex-1 truncate font-medium ${t.completed ? "line-through" : ""}`}>{t.title}</span>
                     </button>
                   ))}
                   {list.length > 3 && <p className="px-1 text-xs text-slate-500">+{list.length - 3} más</p>}
