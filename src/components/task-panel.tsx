@@ -7,6 +7,7 @@ import { PRIORITY_LABEL } from "@/lib/types";
 import { displayName, positionBetween } from "@/lib/utils";
 import { Avatar } from "./avatar";
 import { TaskAttachments } from "./task-attachments";
+import { Linkify, extractLinks } from "./linkify";
 import { useProjectPeople } from "./project-people";
 import { CheckButton, ColorPicker } from "./task-fields";
 import { useWorkspace } from "./workspace-provider";
@@ -272,6 +273,15 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
             defaultValue={task.description ?? ""}
             onBlur={(e) => e.target.value !== (task.description ?? "") && update({ description: e.target.value || null })}
           />
+          {task.description && extractLinks(task.description).length > 0 && (
+            <ul className="mt-1 space-y-0.5 text-sm">
+              {extractLinks(task.description).map((l) => (
+                <li key={l}>
+                  🔗 <Linkify text={l} />
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <TaskAttachments taskId={task.id} />
@@ -325,7 +335,9 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
                     <p className="text-xs text-slate-500">
                       <span className="font-medium text-slate-700">{displayName(author)}</span> {formatWhen(c.created_at)}
                     </p>
-                    <p className="text-sm whitespace-pre-wrap">{c.body}</p>
+                    <p className="text-sm break-words whitespace-pre-wrap">
+                      <Linkify text={c.body} />
+                    </p>
                   </div>
                 </li>
               );
