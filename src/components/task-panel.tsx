@@ -111,17 +111,25 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
     await load();
   }
 
-  async function handOff(e: React.FormEvent) {
-    e.preventDefault();
-    if (!handoffTo) return;
-    const { error } = await supabase.from("tasks").update({ assignee_id: handoffTo }).eq("id", taskId);
+  // Una colaboradora que pasa su tarea deja de verla, así que el panel se cierra.
+  async function passTo(toUser: string | null, note: string) {
+    // La dueña puede asignar a cualquiera (si no participaba, queda sumada al proyecto).
+    const { error } = isAdmin
+      ? await supabase.from("tasks").update({ assignee_id: toUser }).eq("id", taskId)
+      : await supabase.rpc("pass_task", { task: taskId, to_user: toUser, note });
+    if (!error && isAdmin && note.trim()) await supabase.from("comments").insert({ task_id: taskId, user_id: me.id, body: note.trim() });
     if (error) return alert("No se pudo pasar la tarea: " + error.message);
-    if (handoffNote.trim()) await supabase.from("comments").insert({ task_id: taskId, user_id: me.id, body: handoffNote.trim() });
     setHandoffTo("");
     setHandoffNote("");
     setHandingOff(false);
-    await load();
     onChanged();
+    if (isAdmin) await load();
+    else onClose();
+  }
+
+  async function handOff(e: React.FormEvent) {
+    e.preventDefault();
+    if (handoffTo) await passTo(handoffTo, handoffNote);
   }
 
   async function deleteTask() {
@@ -168,7 +176,7 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
             <select
               className="input py-1"
               value={task.assignee_id ?? ""}
-              onChange={(e) => update({ assignee_id: e.target.value || null })}
+              onChange={(e) => (isAdmin ? update({ assignee_id: e.target.value || null }) : passTo(e.target.value || null, ""))}
             >
               <option value="">Sin asignar</option>
               {assignable.map((m) => (
