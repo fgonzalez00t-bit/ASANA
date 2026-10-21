@@ -1,5 +1,6 @@
 "use client";
 
+import { DndContext, DragOverlay, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { TaskPanel } from "@/components/task-panel";
@@ -7,7 +8,7 @@ import { useProjectPeople } from "@/components/project-people";
 import { CheckButton, PriorityBadge } from "@/components/task-fields";
 import { useWorkspace } from "@/components/workspace-provider";
 import { createClient } from "@/lib/supabase/client";
-import type { Project, Task } from "@/lib/types";
+import type { Profile, Project, Task } from "@/lib/types";
 import { displayName, positionBetween } from "@/lib/utils";
 
 type CalTask = Task & { project: Pick<Project, "id" | "name" | "color" | "workspace_id"> };
@@ -48,6 +49,11 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
   const [assigneeId, setAssigneeId] = useState("");
   const [quickAdd, setQuickAdd] = useState(false);
   const { people } = useProjectPeople(projectId);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+  );
 
   const days = useMemo(() => monthGrid(cursor.year, cursor.month), [cursor]);
   const from = iso(days[0]!);
@@ -128,6 +134,20 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
     await load();
   }
 
+  // Arrastrar una tarea a otro día le cambia la fecha.
+  async function onDragEnd({ active, over }: DragEndEvent) {
+    setDragging(null);
+    const task = tasks.find((t) => t.id === active.id);
+    const day = over ? String(over.id) : null;
+    if (!task || !day || task.due_date === day) return;
+    setTasks((list) => list.map((t) => (t.id === task.id ? { ...t, due_date: day } : t)));
+    const { error } = await supabase.from("tasks").update({ due_date: day }).eq("id", task.id);
+    if (error) {
+      alert("No se pudo cambiar la fecha: " + error.message);
+      await load();
+    }
+  }
+
   function openQuickAdd(day: string) {
     setSelected(day);
     setTitle("");
@@ -139,6 +159,7 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
   const [sy, sm, sd] = selected.split("-").map(Number);
   const selectedLabel = new Date(sy!, sm! - 1, sd!).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
   const selectedTasks = byDay.get(selected) ?? [];
+  const draggingTask = dragging ? tasks.find((t) => t.id === dragging) : undefined;
 
   return (
     <div className={fixedProject ? "p-4" : "mx-auto max-w-6xl p-4 md:p-8"}>
@@ -174,6 +195,7 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
             </div>
           ))}
         </div>
+        <DndContext sensors={sensors} onDragStart={(e) => setDragging(String(e.active.id))} onDragCancel={() => setDragging(null)} onDragEnd={onDragEnd}>
         <div className="grid grid-cols-7">
           {days.map((d) => {
             const key = iso(d);
@@ -182,10 +204,10 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
             const isToday = key === today;
             const isSelected = key === selected;
             return (
-              <div
+              <DayCell
                 key={key}
+                id={key}
                 onClick={() => openQuickAdd(key)}
-                title="Tocá para crear una tarea este día"
                 className={`min-h-16 cursor-pointer border-r border-b border-slate-100 p-1 md:min-h-28 ${inMonth ? "" : "bg-slate-50/70"} ${isSelected ? "ring-2 ring-indigo-400 ring-inset" : "hover:bg-slate-50"}`}
               >
                 <div className="mb-1 flex justify-end">
@@ -198,40 +220,34 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
                 {/* Celular: la cara de cada responsable. Computadora: tarjeta con responsable y nombre. */}
                 <div className="flex flex-wrap gap-0.5 md:hidden">
                   {list.slice(0, 2).map((t) => (
-                    <span key={t.id} className={t.completed ? "opacity-40" : ""}>
-                      <Avatar profile={profileOf(t.assignee_id)} size="xs" />
-                    </span>
+                    <Draggable key={t.id} id={t.id}>
+                      <span className={t.completed ? "opacity-40" : ""}>
+                        <Avatar profile={profileOf(t.assignee_id)} size="xs" />
+                      </span>
+                    </Draggable>
                   ))}
                   {list.length > 2 && <span className="text-[10px] text-slate-500">+{list.length - 2}</span>}
                 </div>
                 <div className="hidden space-y-1 md:block">
                   {list.slice(0, 3).map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenTask(t.id);
-                      }}
-                      className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-xs text-white shadow-sm hover:brightness-110 ${t.completed ? "opacity-50" : ""}`}
-                      style={{ background: t.color ?? t.project.color }}
-                      title={`${t.title} · ${displayName(profileOf(t.assignee_id))} · ${t.project.name}`}
-                    >
-                      {t.completed ? (
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/30 font-bold">✓</span>
-                      ) : (
-                        <span className="shrink-0 rounded-full ring-1 ring-white/80">
-                          <Avatar profile={profileOf(t.assignee_id)} size="xs" />
-                        </span>
-                      )}
-                      <span className={`min-w-0 flex-1 truncate font-medium ${t.completed ? "line-through" : ""}`}>{t.title}</span>
-                    </button>
+                    <Draggable key={t.id} id={t.id}>
+                      <TaskCard task={t} assignee={profileOf(t.assignee_id)} onOpen={() => setOpenTask(t.id)} />
+                    </Draggable>
                   ))}
                   {list.length > 3 && <p className="px-1 text-xs text-slate-500">+{list.length - 3} más</p>}
                 </div>
-              </div>
+              </DayCell>
             );
           })}
         </div>
+          <DragOverlay>
+            {draggingTask && (
+              <div className="w-40 rotate-2 cursor-grabbing shadow-lg">
+                <TaskCard task={draggingTask} assignee={profileOf(draggingTask.assignee_id)} />
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       <section className="mt-6">
@@ -321,5 +337,46 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
 
       {openTask && <TaskPanel taskId={openTask} onClose={() => setOpenTask(null)} onChanged={load} />}
     </div>
+  );
+}
+
+function DayCell({ id, className, onClick, children }: { id: string; className: string; onClick: () => void; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} onClick={onClick} title="Tocá para crear una tarea este día" className={`${className} ${isOver ? "bg-indigo-50" : ""}`}>
+      {children}
+    </div>
+  );
+}
+
+function Draggable({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, listeners, attributes, isDragging } = useDraggable({ id });
+  return (
+    <div ref={setNodeRef} {...listeners} {...attributes} className={`touch-manipulation ${isDragging ? "opacity-30" : ""}`}>
+      {children}
+    </div>
+  );
+}
+
+function TaskCard({ task: t, assignee, onOpen }: { task: CalTask; assignee: Profile | null; onOpen?: () => void }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen?.();
+      }}
+      className={`flex w-full cursor-grab items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-xs text-white shadow-sm hover:brightness-110 ${t.completed ? "opacity-50" : ""}`}
+      style={{ background: t.color ?? t.project.color }}
+      title={`${t.title} · ${displayName(assignee)} · ${t.project.name}. Arrastrala a otro día para cambiar la fecha.`}
+    >
+      {t.completed ? (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/30 font-bold">✓</span>
+      ) : (
+        <span className="shrink-0 rounded-full ring-1 ring-white/80">
+          <Avatar profile={assignee} size="xs" />
+        </span>
+      )}
+      <span className={`min-w-0 flex-1 truncate font-medium ${t.completed ? "line-through" : ""}`}>{t.title}</span>
+    </button>
   );
 }
