@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { NO_SECTION, ProjectBoard, type Column } from "@/components/project-board";
 import { Avatar } from "@/components/avatar";
 import { MonthCalendar } from "@/components/month-calendar";
+import { ProjectActivity } from "@/components/project-activity";
 import { ProjectMembersDialog, useProjectPeople } from "@/components/project-people";
 import { TaskPanel } from "@/components/task-panel";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -13,7 +14,7 @@ import { ColorPicker } from "@/components/task-fields";
 import type { Section, Task } from "@/lib/types";
 import { positionBetween } from "@/lib/utils";
 
-type Layout = "lista" | "tablero" | "calendario";
+type Layout = "lista" | "tablero" | "calendario" | "actividad";
 const LAYOUT_KEY = "tareas.vista";
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
@@ -44,7 +45,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LAYOUT_KEY);
-      if (saved === "lista" || saved === "tablero" || saved === "calendario") setLayout(saved);
+      if (saved === "lista" || saved === "tablero" || saved === "calendario" || saved === "actividad") setLayout(saved);
     } catch {}
   }, []);
 
@@ -239,12 +240,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           {tab("lista", "Lista")}
           {tab("tablero", "Tablero")}
           {tab("calendario", "Calendario")}
+          {tab("actividad", "Actividad")}
           <span className="flex-1" />
-          <label className={`flex items-center gap-1 pb-2 text-xs text-slate-500 ${layout === "calendario" ? "hidden" : ""}`}>
+          <label className={`flex items-center gap-1 pb-2 text-xs text-slate-500 ${layout === "calendario" || layout === "actividad" ? "hidden" : ""}`}>
             <input type="checkbox" checked={showCompleted} onChange={(e) => setShowCompleted(e.target.checked)} />
             Mostrar completadas
           </label>
-          {isAdmin && layout !== "calendario" && (
+          {isAdmin && (layout === "lista" || layout === "tablero") && (
             <button className="btn-ghost mb-1 text-xs" onClick={addSection}>
               + Sección
             </button>
@@ -254,6 +256,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
       {layout === "calendario" ? (
         <MonthCalendar key={id} projectId={id} />
+      ) : layout === "actividad" ? (
+        <ProjectActivity key={id} projectId={id} projectName={project.name} onOpenTask={setOpenTask} />
       ) : (
         <ProjectBoard
           layout={layout}
