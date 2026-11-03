@@ -219,22 +219,20 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
                 </div>
                 {/* Celular: la cara de cada responsable. Computadora: tarjeta con responsable y nombre. */}
                 <div className="flex flex-wrap gap-0.5 md:hidden">
-                  {list.slice(0, 2).map((t) => (
+                  {list.map((t) => (
                     <Draggable key={t.id} id={t.id}>
                       <span className={t.completed ? "opacity-40" : ""}>
                         <Avatar profile={profileOf(t.assignee_id)} size="xs" />
                       </span>
                     </Draggable>
                   ))}
-                  {list.length > 2 && <span className="text-[10px] text-slate-500">+{list.length - 2}</span>}
                 </div>
                 <div className="hidden space-y-1 md:block">
-                  {list.slice(0, 3).map((t) => (
+                  {list.map((t) => (
                     <Draggable key={t.id} id={t.id}>
                       <TaskCard task={t} assignee={profileOf(t.assignee_id)} onOpen={() => setOpenTask(t.id)} />
                     </Draggable>
                   ))}
-                  {list.length > 3 && <p className="px-1 text-xs text-slate-500">+{list.length - 3} más</p>}
                 </div>
               </DayCell>
             );
