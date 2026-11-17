@@ -12,6 +12,29 @@ export default function LoginPage() {
   );
 }
 
+// Traduce los errores de Supabase a mensajes claros.
+function explainError(error: { message?: string; code?: string; status?: number }): string {
+  const msg = (error.message ?? "").toLowerCase();
+  const code = error.code ?? "";
+  if (code === "email_not_confirmed" || msg.includes("email not confirmed"))
+    return "Tu correo todavía no está confirmado. Busca el email de confirmación (revisa también Spam) o pide a la dueña que te habilite.";
+  if (code === "invalid_credentials" || msg.includes("invalid login credentials"))
+    return "Email o contraseña incorrectos. Si aún no tienes cuenta, toca \"Regístrate\".";
+  if (code === "over_email_send_rate_limit" || msg.includes("rate limit"))
+    return "Se enviaron demasiados emails en poco tiempo. Espera un rato y vuelve a intentar.";
+  if (code === "email_address_not_authorized" || msg.includes("not authorized"))
+    return "Por ahora no se pueden enviar emails de confirmación a este correo. Avisa a la dueña de la app.";
+  if (code === "signup_disabled" || msg.includes("signups not allowed"))
+    return "El registro de cuentas nuevas está desactivado. Avisa a la dueña de la app.";
+  if (code === "user_already_exists" || msg.includes("already registered"))
+    return "Ese correo ya tiene cuenta. Toca \"Inicia sesión\".";
+  if (code === "weak_password" || msg.includes("password"))
+    return "La contraseña no es válida. Usa al menos 6 caracteres.";
+  if (code === "email_address_invalid" || msg.includes("invalid"))
+    return "Ese correo no es válido. Revísalo.";
+  return error.message || "Algo salió mal. Intenta de nuevo.";
+}
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -34,7 +57,7 @@ function LoginForm() {
     if (mode === "entrar") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
-      if (error) return setError("Email o contraseña incorrectos.");
+      if (error) return setError(explainError(error));
       router.replace(next);
       router.refresh();
       return;
@@ -49,12 +72,17 @@ function LoginForm() {
       },
     });
     setLoading(false);
-    if (error) return setError(error.message);
+    if (error) return setError(explainError(error));
+    // Supabase devuelve un usuario sin identidades cuando el correo ya estaba registrado.
+    if (data.user && data.user.identities?.length === 0) {
+      setMode("entrar");
+      return setError("Ese correo ya tiene cuenta. Escribe tu contraseña y toca Entrar.");
+    }
     if (data.session) {
       router.replace(next);
       router.refresh();
     } else {
-      setInfo("Te enviamos un email para confirmar tu cuenta. Ábrelo y vuelve a entrar.");
+      setInfo("Te enviamos un email para confirmar tu cuenta (revisa también Spam). Ábrelo y vuelve a entrar.");
     }
   }
 
