@@ -4,15 +4,18 @@ import { DndContext, DragOverlay, PointerSensor, TouchSensor, useDraggable, useD
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { TaskPanel } from "@/components/task-panel";
+import { useAllLabels } from "@/components/project-labels";
 import { useProjectPeople } from "@/components/project-people";
 import { CheckButton, PriorityBadge } from "@/components/task-fields";
 import { useWorkspace } from "@/components/workspace-provider";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile, Project, Task } from "@/lib/types";
+import { labelClass, projectLabels, type Profile, type Project, type Task } from "@/lib/types";
 import { displayName, positionBetween } from "@/lib/utils";
 
 type CalTask = Task & { project: Pick<Project, "id" | "name" | "color" | "workspace_id"> };
 
+const LABELS_KEY = "tareas.calendario-etiquetas";
+const NO_LABEL = "__sin_etiqueta__";
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 function iso(d: Date) {
@@ -50,6 +53,51 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
   const [quickAdd, setQuickAdd] = useState(false);
   const { people } = useProjectPeople(projectId);
   const [dragging, setDragging] = useState<string | null>(null);
+  const allLabels = useAllLabels();
+  const [labelFilter, setLabelFilter] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (fixedProject) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(LABELS_KEY) ?? "[]");
+      if (Array.isArray(saved)) setLabelFilter(saved.filter((x) => typeof x === "string"));
+    } catch {}
+  }, [fixedProject]);
+
+  function toggleLabel(l: string) {
+    setLabelFilter((list) => {
+      const next = list.includes(l) ? list.filter((x) => x !== l) : [...list, l];
+      try {
+        localStorage.setItem(LABELS_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }
+
+  function clearLabels() {
+    setLabelFilter([]);
+    try {
+      localStorage.removeItem(LABELS_KEY);
+    } catch {}
+  }
+
+  // Etiquetas elegidas que todavía existen. Sin ninguna elegida se ve todo.
+  const activeLabels = useMemo(
+    () => (fixedProject ? [] : labelFilter.filter((l) => l === NO_LABEL || allLabels.includes(l))),
+    [fixedProject, labelFilter, allLabels],
+  );
+  const hasUnlabeled = projects.some((p) => projectLabels(p).length === 0);
+  const allowedProjects = useMemo(() => {
+    if (activeLabels.length === 0) return null;
+    return new Set(
+      projects
+        .filter((p) => {
+          const labels = projectLabels(p);
+          return activeLabels.some((l) => (l === NO_LABEL ? labels.length === 0 : labels.includes(l)));
+        })
+        .map((p) => p.id),
+    );
+  }, [projects, activeLabels]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
@@ -88,12 +136,13 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
     const map = new Map<string, CalTask[]>();
     for (const t of tasks) {
       if (!t.due_date) continue;
+      if (allowedProjects && !allowedProjects.has(t.project_id)) continue;
       const list = map.get(t.due_date) ?? [];
       list.push(t);
       map.set(t.due_date, list);
     }
     return map;
-  }, [tasks]);
+  }, [tasks, allowedProjects]);
 
   const profileOf = (id: string | null) => members.find((m) => m.user_id === id)?.profile ?? null;
 
@@ -186,6 +235,35 @@ export function MonthCalendar({ projectId: fixedProject }: { projectId?: string 
           Mostrar completadas
         </label>
       </div>
+
+      {!fixedProject && allLabels.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="mr-1 text-slate-500">Etiquetas:</span>
+          <button
+            onClick={clearLabels}
+            className={`rounded-full px-2 py-0.5 ${activeLabels.length === 0 ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+          >
+            Todas
+          </button>
+          {allLabels.map((l) => (
+            <button
+              key={l}
+              onClick={() => toggleLabel(l)}
+              className={`rounded-full px-2 py-0.5 font-medium ${activeLabels.includes(l) ? `${labelClass(l)} ring-2 ring-slate-500` : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+            >
+              {l}
+            </button>
+          ))}
+          {hasUnlabeled && (
+            <button
+              onClick={() => toggleLabel(NO_LABEL)}
+              className={`rounded-full px-2 py-0.5 ${activeLabels.includes(NO_LABEL) ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+            >
+              Sin etiqueta
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
         <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-medium text-slate-500">
