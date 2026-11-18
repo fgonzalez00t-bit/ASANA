@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { labelClass, PROJECT_COLORS, projectLabels, ROLE_LABEL } from "@/lib/types";
+import { PROJECT_COLORS, projectLabels, ROLE_LABEL, type Project } from "@/lib/types";
 import { displayName } from "@/lib/utils";
 import { Avatar } from "./avatar";
 import { useAllLabels } from "./project-labels";
 import { useWorkspace } from "./workspace-provider";
 
 const DEFAULT_SECTIONS = ["Pendiente", "En curso", "Hecho"];
-const FILTER_KEY = "tareas.filtro-etiqueta";
+const CLOSED_KEY = "tareas.grupos-cerrados";
 const NO_LABEL = "__sin_etiqueta__";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -21,39 +21,67 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const [labelFilter, setLabelFilter] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [closed, setClosed] = useState<string[]>([]);
   const allLabels = useAllLabels();
 
   useEffect(() => {
     try {
-      setLabelFilter(localStorage.getItem(FILTER_KEY));
+      const saved = JSON.parse(localStorage.getItem(CLOSED_KEY) ?? "[]");
+      if (Array.isArray(saved)) setClosed(saved.filter((x) => typeof x === "string"));
     } catch {}
   }, []);
 
-  function chooseFilter(value: string | null) {
-    const next = value === labelFilter ? null : value;
-    setLabelFilter(next);
-    try {
-      if (next) localStorage.setItem(FILTER_KEY, next);
-      else localStorage.removeItem(FILTER_KEY);
-    } catch {}
+  function toggleGroup(key: string) {
+    setClosed((list) => {
+      const next = list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+      try {
+        localStorage.setItem(CLOSED_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   }
 
-  // Si la etiqueta elegida ya no existe, se muestran todos.
-  const activeFilter = labelFilter === NO_LABEL || (labelFilter && allLabels.includes(labelFilter)) ? labelFilter : null;
-  const hasUnlabeled = projects.some((p) => projectLabels(p).length === 0);
+  function startCreating(label: string | null) {
+    setNewLabel(label);
+    setNewName("");
+    setCreating(true);
+    // Si el grupo estaba cerrado, se abre para ver el proyecto nuevo.
+    if (label && closed.includes(label)) toggleGroup(label);
+  }
 
+  const searching = search.trim().length > 0;
   const visibleProjects = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return projects.filter((p) => {
-      const labels = projectLabels(p);
-      if (activeFilter === NO_LABEL && labels.length > 0) return false;
-      if (activeFilter && activeFilter !== NO_LABEL && !labels.includes(activeFilter)) return false;
-      if (q && !p.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [projects, activeFilter, search]);
+    return q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
+  }, [projects, search]);
+
+  // Proyectos agrupados por etiqueta, como carpetas que se abren y se cierran.
+  // Un proyecto con varias etiquetas aparece en cada una. Sin etiquetas, lista simple.
+  const groups = useMemo(() => {
+    if (allLabels.length === 0) return null;
+    const list: { key: string; label: string | null; name: string; projects: Project[] }[] = allLabels.map((l) => ({
+      key: l,
+      label: l,
+      name: l,
+      projects: visibleProjects.filter((p) => projectLabels(p).includes(l)),
+    }));
+    list.push({ key: NO_LABEL, label: null, name: "Sin etiqueta", projects: visibleProjects.filter((p) => projectLabels(p).length === 0) });
+    return list.filter((g) => g.projects.length > 0 || (!searching && g.label !== null));
+  }, [allLabels, visibleProjects, searching]);
+
+  const projectLink = (p: Project) => (
+    <Link
+      key={p.id}
+      href={`/proyecto/${p.id}`}
+      onClick={() => setOpen(false)}
+      className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${pathname === `/proyecto/${p.id}` ? "bg-white/15 text-white" : "text-slate-300 hover:bg-white/10"}`}
+    >
+      <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: p.color }} />
+      <span className="truncate">{p.name}</span>
+    </Link>
+  );
 
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const color = PROJECT_COLORS[projects.length % PROJECT_COLORS.length];
     const { data, error } = await supabase
       .from("projects")
-      .insert({ workspace_id: workspace.id, name: newName.trim(), color, created_by: me.id })
+      .insert({ workspace_id: workspace.id, name: newName.trim(), color, created_by: me.id, ...(newLabel ? { labels: [newLabel] } : {}) })
       .select()
       .single();
     if (error || !data) return alert(error?.message ?? "No se pudo crear el proyecto");
@@ -118,75 +146,66 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center justify-between px-3 pt-5 pb-1">
             <span className="text-xs font-semibold tracking-wide text-slate-400 uppercase">Proyectos</span>
             {isAdmin && (
-              <button className="text-lg leading-none text-slate-400 hover:text-white" title="Nuevo proyecto" onClick={() => setCreating(true)}>
+              <button className="text-lg leading-none text-slate-400 hover:text-white" title="Nuevo proyecto" onClick={() => startCreating(null)}>
                 +
               </button>
             )}
           </div>
+          {projects.length > 6 && (
+            <div className="px-2 pb-1">
+              <input
+                className="w-full rounded-md bg-white/10 px-2 py-1.5 text-xs text-white outline-none placeholder:text-slate-400"
+                placeholder="Buscar proyecto..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
           {creating && (
             <form onSubmit={createProject} className="px-2 pb-2">
               <input
                 autoFocus
                 className="w-full rounded-md bg-white/10 px-2 py-1.5 text-sm text-white outline-none placeholder:text-slate-400"
-                placeholder="Nombre del proyecto"
+                placeholder={newLabel ? `Nuevo proyecto en ${newLabel}` : "Nombre del proyecto"}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onBlur={() => !newName && setCreating(false)}
+                onKeyDown={(e) => e.key === "Escape" && setCreating(false)}
               />
             </form>
           )}
-          {(allLabels.length > 0 || projects.length > 6) && (
-            <div className="space-y-2 px-2 pb-2">
-              {projects.length > 6 && (
-                <input
-                  className="w-full rounded-md bg-white/10 px-2 py-1.5 text-xs text-white outline-none placeholder:text-slate-400"
-                  placeholder="Buscar proyecto..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              )}
-              {allLabels.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  <button
-                    onClick={() => chooseFilter(null)}
-                    className={`rounded-full px-2 py-0.5 text-[11px] ${!activeFilter ? "bg-white text-slate-900" : "bg-white/10 text-slate-300 hover:bg-white/20"}`}
-                  >
-                    Todos
-                  </button>
-                  {allLabels.map((l) => (
-                    <button
-                      key={l}
-                      onClick={() => chooseFilter(l)}
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${activeFilter === l ? `${labelClass(l)} ring-2 ring-white` : "bg-white/10 text-slate-300 hover:bg-white/20"}`}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                  {hasUnlabeled && (
-                    <button
-                      onClick={() => chooseFilter(NO_LABEL)}
-                      className={`rounded-full px-2 py-0.5 text-[11px] ${activeFilter === NO_LABEL ? "bg-white text-slate-900" : "bg-white/10 text-slate-400 hover:bg-white/20"}`}
-                    >
-                      Sin etiqueta
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {visibleProjects.map((p) => (
-            <Link
-              key={p.id}
-              href={`/proyecto/${p.id}`}
-              onClick={() => setOpen(false)}
-              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${pathname === `/proyecto/${p.id}` ? "bg-white/15 text-white" : "text-slate-300 hover:bg-white/10"}`}
-            >
-              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: p.color }} />
-              <span className="truncate">{p.name}</span>
-            </Link>
-          ))}
+          {groups
+            ? groups.map((g) => {
+                const isOpen = searching || !closed.includes(g.key);
+                return (
+                  <div key={g.key} className="pt-1">
+                    <div className="group flex items-center rounded-md pr-2 hover:bg-white/5">
+                      <button
+                        className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-left text-sm font-medium text-slate-300"
+                        onClick={() => toggleGroup(g.key)}
+                        aria-expanded={isOpen}
+                      >
+                        <span className={`w-3 shrink-0 text-[10px] text-slate-400 transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
+                        <span className="truncate">{g.name}</span>
+                        <span className="text-xs font-normal text-slate-500">{g.projects.length}</span>
+                      </button>
+                      {isAdmin && (
+                        <button
+                          className="text-base leading-none text-slate-500 opacity-0 group-hover:opacity-100 hover:text-white max-md:opacity-100"
+                          title={`Nuevo proyecto en ${g.name}`}
+                          onClick={() => startCreating(g.label)}
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                    {isOpen && <div className="space-y-0.5 pl-3">{g.projects.map(projectLink)}</div>}
+                  </div>
+                );
+              })
+            : visibleProjects.map(projectLink)}
           {projects.length > 0 && visibleProjects.length === 0 && (
-            <p className="px-3 text-xs text-slate-500">Ningún proyecto coincide con el filtro.</p>
+            <p className="px-3 text-xs text-slate-500">Ningún proyecto coincide con la búsqueda.</p>
           )}
           {projects.length === 0 && !creating && (
             <p className="px-3 text-xs text-slate-500">{isAdmin ? "Crea tu primer proyecto con +" : "Aún no hay proyectos."}</p>
