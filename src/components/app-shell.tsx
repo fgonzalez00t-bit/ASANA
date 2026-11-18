@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { PROJECT_COLORS, ROLE_LABEL } from "@/lib/types";
+import { labelClass, PROJECT_COLORS, projectLabels, ROLE_LABEL } from "@/lib/types";
 import { displayName } from "@/lib/utils";
 import { Avatar } from "./avatar";
+import { useAllLabels } from "./project-labels";
 import { useWorkspace } from "./workspace-provider";
 
 const DEFAULT_SECTIONS = ["Pendiente", "En curso", "Hecho"];
+const FILTER_KEY = "tareas.filtro-etiqueta";
+const NO_LABEL = "__sin_etiqueta__";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { me, workspaces, workspace, role, isAdmin, projects, selectWorkspace, reload } = useWorkspace();
@@ -18,6 +21,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [labelFilter, setLabelFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const allLabels = useAllLabels();
+
+  useEffect(() => {
+    try {
+      setLabelFilter(localStorage.getItem(FILTER_KEY));
+    } catch {}
+  }, []);
+
+  function chooseFilter(value: string | null) {
+    const next = value === labelFilter ? null : value;
+    setLabelFilter(next);
+    try {
+      if (next) localStorage.setItem(FILTER_KEY, next);
+      else localStorage.removeItem(FILTER_KEY);
+    } catch {}
+  }
+
+  // Si la etiqueta elegida ya no existe, se muestran todos.
+  const activeFilter = labelFilter === NO_LABEL || (labelFilter && allLabels.includes(labelFilter)) ? labelFilter : null;
+  const hasUnlabeled = projects.some((p) => projectLabels(p).length === 0);
+
+  const visibleProjects = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return projects.filter((p) => {
+      const labels = projectLabels(p);
+      if (activeFilter === NO_LABEL && labels.length > 0) return false;
+      if (activeFilter && activeFilter !== NO_LABEL && !labels.includes(activeFilter)) return false;
+      if (q && !p.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [projects, activeFilter, search]);
 
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
@@ -99,7 +135,46 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
             </form>
           )}
-          {projects.map((p) => (
+          {(allLabels.length > 0 || projects.length > 6) && (
+            <div className="space-y-2 px-2 pb-2">
+              {projects.length > 6 && (
+                <input
+                  className="w-full rounded-md bg-white/10 px-2 py-1.5 text-xs text-white outline-none placeholder:text-slate-400"
+                  placeholder="Buscar proyecto..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              )}
+              {allLabels.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => chooseFilter(null)}
+                    className={`rounded-full px-2 py-0.5 text-[11px] ${!activeFilter ? "bg-white text-slate-900" : "bg-white/10 text-slate-300 hover:bg-white/20"}`}
+                  >
+                    Todos
+                  </button>
+                  {allLabels.map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => chooseFilter(l)}
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${activeFilter === l ? `${labelClass(l)} ring-2 ring-white` : "bg-white/10 text-slate-300 hover:bg-white/20"}`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                  {hasUnlabeled && (
+                    <button
+                      onClick={() => chooseFilter(NO_LABEL)}
+                      className={`rounded-full px-2 py-0.5 text-[11px] ${activeFilter === NO_LABEL ? "bg-white text-slate-900" : "bg-white/10 text-slate-400 hover:bg-white/20"}`}
+                    >
+                      Sin etiqueta
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {visibleProjects.map((p) => (
             <Link
               key={p.id}
               href={`/proyecto/${p.id}`}
@@ -110,6 +185,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="truncate">{p.name}</span>
             </Link>
           ))}
+          {projects.length > 0 && visibleProjects.length === 0 && (
+            <p className="px-3 text-xs text-slate-500">Ningún proyecto coincide con el filtro.</p>
+          )}
           {projects.length === 0 && !creating && (
             <p className="px-3 text-xs text-slate-500">{isAdmin ? "Crea tu primer proyecto con +" : "Aún no hay proyectos."}</p>
           )}

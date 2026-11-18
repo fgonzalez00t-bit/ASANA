@@ -6,6 +6,7 @@ import { NO_SECTION, ProjectBoard, type Column } from "@/components/project-boar
 import { Avatar } from "@/components/avatar";
 import { MonthCalendar } from "@/components/month-calendar";
 import { ProjectActivity } from "@/components/project-activity";
+import { ProjectLabelsEditor } from "@/components/project-labels";
 import { ProjectMembersDialog, useProjectPeople } from "@/components/project-people";
 import { TaskPanel } from "@/components/task-panel";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -236,6 +237,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             </>
           )}
         </div>
+        <ProjectLabelsEditor project={project} />
         <div className="mt-3 flex items-center gap-4">
           {tab("lista", "Lista")}
           {tab("tablero", "Tablero")}
