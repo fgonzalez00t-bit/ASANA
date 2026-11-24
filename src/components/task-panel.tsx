@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Comment, Priority, Section, Task, TaskActivity } from "@/lib/types";
-import { PRIORITY_LABEL } from "@/lib/types";
+import { PRIORITY_LABEL, labelClass, projectLabels } from "@/lib/types";
 import { describeActivity, formatWhen } from "@/lib/activity";
 import { displayName, positionBetween } from "@/lib/utils";
 import { Avatar } from "./avatar";
@@ -22,7 +23,7 @@ type Props = {
 
 export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const { me, members, isAdmin } = useWorkspace();
+  const { me, members, isAdmin, projects } = useWorkspace();
   const [task, setTask] = useState<Task | null>(null);
   const [subtasks, setSubtasks] = useState<Task[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -63,6 +64,7 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
     return <Drawer onClose={onClose}>{<p className="p-6 text-sm text-slate-400">Cargando...</p>}</Drawer>;
   }
 
+  const project = projects.find((p) => p.id === task.project_id) ?? null;
   const profileOf = (id: string | null) => members.find((m) => m.user_id === id)?.profile ?? null;
   const timeline: TimelineItem[] = [
     ...comments.map((entry) => ({ kind: "comentario" as const, at: entry.created_at, entry })),
@@ -156,6 +158,30 @@ export function TaskPanel({ taskId, sections, onClose, onChanged }: Props) {
       </div>
 
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
+        {project && (
+          <Link
+            href={`/proyecto/${project.id}`}
+            className="flex items-center gap-3 rounded-lg border px-3 py-2 hover:opacity-90"
+            style={{ borderColor: project.color, backgroundColor: `${project.color}14` }}
+            title="Ir al proyecto"
+          >
+            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs uppercase tracking-wide text-slate-500">Cliente / proyecto</span>
+              <span className="block truncate text-base font-semibold text-slate-800">{project.name}</span>
+            </span>
+            {projectLabels(project).length > 0 && (
+              <span className="flex flex-wrap justify-end gap-1">
+                {projectLabels(project).map((l) => (
+                  <span key={l} className={`rounded-full px-2 py-0.5 text-xs ${labelClass(l)}`}>
+                    {l}
+                  </span>
+                ))}
+              </span>
+            )}
+          </Link>
+        )}
+
         <textarea
           key={`title-${task.id}`}
           className="w-full resize-none rounded-md border border-transparent px-1 py-1 text-xl font-semibold outline-none hover:border-slate-200 focus:border-indigo-400"
